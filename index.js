@@ -6,6 +6,9 @@ require("dotenv").config();
 const Port = process.env.PORT;
 app.use(cors());
 app.use(express.json());
+app.get("/", (req, res) => {
+  res.send("Backend is working!");
+});
 app.listen(Port, async () => {
   console.log(`server is runing on ${Port}`);
   try {
