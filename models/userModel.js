@@ -21,6 +21,11 @@ const userSchema = mongoose.Schema({
     type: String,
     default: null,
   },
+  gender: {
+    type: String,
+    enum: ["male", "female"],
+    required: true,
+  },
   created_ts: {
     type: Date,
     default: Date.now,

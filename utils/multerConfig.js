@@ -1,5 +1,8 @@
 const multer = require("multer");
 const path = require("path");
+const fs = require("fs");
+
+// Create uploads directory if it doesn't exist
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
@@ -10,6 +13,6 @@ const storage = multer.diskStorage({
   },
 });
 
-const upload = multer({ storage: storage });
+const upload = multer({ storage });
 
 module.exports = upload;

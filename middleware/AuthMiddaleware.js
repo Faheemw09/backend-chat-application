@@ -21,6 +21,4 @@ const auth = (req, res, next) => {
     res.send({ msg: "please login ist" });
   }
 };
-module.exports = {
-  auth,
-};
+module.exports = auth;

@@ -1,4 +1,5 @@
 const messageModel = require("../models/message.model");
+const userModel = require("../models/userModel");
 const User = require("../models/userModel");
 const mongoose = require("mongoose");
 const ObjectId = mongoose.Types.ObjectId;
@@ -12,9 +13,46 @@ exports.sendMessage = async (req, res) => {
       message,
     });
     await newMessage.save();
+
+    // Emit the message via Socket.IO
+    req.io.to(receiver).emit("message", {
+      _id: newMessage._id,
+      sender: {
+        id: sender,
+        name: (await userModel.findById(sender)).name, // Fetch the sender's name
+        profilePic: (await userModel.findById(sender)).profilePic, // Fetch the sender's profile picture
+      },
+      receiver: {
+        id: receiver,
+      },
+      message: newMessage.message,
+      timestamp: newMessage.timestamp,
+      read: false,
+    });
+    console.log("Emitted message via Socket.IO:", {
+      _id: newMessage._id,
+      sender: sender,
+      receiver: receiver,
+      message: newMessage.message,
+      timestamp: newMessage.timestamp,
+      read: newMessage.read,
+    });
+
     res.status(200).json({
       message: "Message sent successfully",
-      data: newMessage,
+      status: "success",
+      data: {
+        _id: newMessage._id,
+        sender: {
+          id: sender,
+        },
+        receiver: {
+          id: receiver,
+        },
+        message: newMessage.message,
+        timestamp: newMessage.timestamp,
+        read: newMessage.read,
+      },
     });
   } catch (error) {
     console.error("Error sending message:", error);
@@ -24,72 +62,62 @@ exports.sendMessage = async (req, res) => {
   }
 };
 
-// Ensure this points to your actual message model
-
-// Ensure you have a user model to get user details
-
 exports.getUserChats = async (req, res) => {
   const { userId } = req.params;
-  console.log("UserId:", userId); // Log the incoming userId
+  console.log("UserId:", userId);
 
   try {
     const userObjectId = new mongoose.Types.ObjectId(userId);
-    console.log("User ObjectId:", userObjectId);
 
     const userChats = await messageModel.aggregate([
       {
-        // Match messages sent to or received from the user
         $match: {
           $or: [{ sender: userObjectId }, { receiver: userObjectId }],
         },
       },
       {
-        // Group messages by sender or receiver
         $group: {
           _id: {
-            $cond: [
-              { $eq: ["$sender", userObjectId] },
-              "$receiver", // If the user is the sender, group by receiver
-              "$sender", // If the user is the receiver, group by sender
-            ],
+            $cond: [{ $eq: ["$sender", userObjectId] }, "$receiver", "$sender"],
           },
-          lastMessage: { $last: "$message" }, // Get the last message
-          lastMessageDate: { $last: "$timestamp" }, // Get the date of the last message
+          lastMessage: { $last: "$message" },
+          lastMessageDate: { $last: "$timestamp" },
+          lastMessageRead: { $last: "$read" }, // Include the read status
         },
       },
       {
-        // Lookup user details based on the grouped ID
         $lookup: {
-          from: "users", // Ensure this matches your collection name
+          from: "users",
           localField: "_id",
           foreignField: "_id",
           as: "userDetails",
         },
       },
       {
-        // Unwind userDetails to flatten the structure
         $unwind: {
           path: "$userDetails",
-          preserveNullAndEmptyArrays: true, // If no user details are found, still return the chat
+          preserveNullAndEmptyArrays: true,
         },
       },
       {
-        // Project the desired fields for the response
         $project: {
           _id: 1,
           lastMessage: 1,
           lastMessageDate: 1,
-          userName: "$userDetails.name", // Assuming the user has a `name` field
-          userProfilePic: "$userDetails.profilePic", // Assuming the user has a `profilePic` field
+          lastMessageRead: 1, // Include the read status in the response
+          userName: "$userDetails.name",
+          userProfilePic: "$userDetails.profilePic",
         },
       },
       {
-        // Optionally, sort the results by lastMessageDate descending
         $sort: { lastMessageDate: -1 },
       },
     ]);
 
     console.log("Retrieved User Chats:", userChats);
+
+    // Emit userChats via Socket.IO
+    req.io.emit("userChats", userChats);
 
     res.status(200).json({
       message: "Chats retrieved successfully",
@@ -103,12 +131,11 @@ exports.getUserChats = async (req, res) => {
   }
 };
 
-// Update with the actual path to your User model
-
 exports.getConversation = async (req, res) => {
   const { userId, receiverId } = req.params;
+
   try {
-    // Fetch the conversation between the two users
+    // Find conversation between the user and the receiver
     const conversation = await messageModel
       .find({
         $or: [
@@ -116,43 +143,41 @@ exports.getConversation = async (req, res) => {
           { sender: receiverId, receiver: userId },
         ],
       })
-      .sort({ timestamp: 1 });
+      .sort({ timestamp: 1 })
+      .populate("sender", "name profilePic")
+      .populate("receiver", "name profilePic");
 
-    // Collect sender and receiver IDs
-    const senderIds = conversation.map((msg) => msg.sender);
-    const receiverIds = conversation.map((msg) => msg.receiver);
+    // Update read status for messages where the receiver is the current user and message is unread
+    await messageModel.updateMany(
+      {
+        sender: receiverId,
+        receiver: userId,
+        read: false,
+      },
+      { $set: { read: true } }
+    );
 
-    // Fetch sender and receiver details
-    const senders = await User.find({ _id: { $in: senderIds } }).lean();
-    const receivers = await User.find({ _id: { $in: receiverIds } }).lean();
-
-    // Create a map for quick lookup
-    const senderMap = senders.reduce((acc, user) => {
-      acc[user._id] = { name: user.name, profilePic: user.profilePic };
-      return acc;
-    }, {});
-
-    const receiverMap = receivers.reduce((acc, user) => {
-      acc[user._id] = { name: user.name, profilePic: user.profilePic };
-      return acc;
-    }, {});
-
-    // Construct the response data
+    // Prepare the response
     const responseData = conversation.map((msg) => ({
       _id: msg._id,
       sender: {
-        id: msg.sender,
-        name: senderMap[msg.sender]?.name,
-        profilePic: senderMap[msg.sender]?.profilePic,
+        id: msg.sender._id,
+        name: msg.sender.name,
+        profilePic: msg.sender.profilePic,
       },
       receiver: {
-        id: msg.receiver,
-        name: receiverMap[msg.receiver]?.name,
-        profilePic: receiverMap[msg.receiver]?.profilePic,
+        id: msg.receiver._id,
+        name: msg.receiver.name,
+        profilePic: msg.receiver.profilePic,
       },
       message: msg.message,
       timestamp: msg.timestamp,
+      read: msg.read, // Include the read status
+      direction: msg.sender._id.equals(userId) ? "sent" : "received",
     }));
+
+    // Emit the conversation via Socket.IO
+    req.io.emit("conversation", responseData);
 
     res.status(200).json({
       message: "Conversation retrieved successfully",

@@ -1,43 +1,82 @@
 const express = require("express");
 const cors = require("cors");
 const http = require("http");
+const path = require("path");
 const socketIO = require("socket.io");
 const { connection } = require("./db");
-
 require("dotenv").config();
+
 const app = express();
 const server = http.createServer(app);
-const io = socketIO(server);
-const Port = process.env.PORT;
-app.use(cors());
-app.use(express.json());
+const io = socketIO(server, {
+  cors: {
+    origin: "*", // Adjust as necessary for your environment
+    methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
+    credentials: true,
+  },
+});
 
+// CORS options for Express
+const corsOptions = {
+  origin: "http://localhost:3000", // Your frontend URL
+  methods: ["GET", "POST", "PATCH", "PUT", "DELETE"],
+  credentials: true,
+};
+
+// Middleware
+app.use(cors(corsOptions)); // Apply CORS middleware with specific options
+app.use(express.json()); // For parsing application/json
+app.use(express.urlencoded({ extended: true })); // For parsing application/x-www-form-urlencoded
+
+app.use((req, res, next) => {
+  req.io = io; // Attach the io instance to the request object
+  next();
+});
+// Port configuration
+const Port = process.env.PORT || 8080;
+
+// Routes
 const userRouter = require("./routes/user.routes");
 const chatRouter = require("./routes/chat.routes");
 
+app.use("/uploads", express.static("uploads"));
 app.use("/api/user", userRouter);
 app.use("/api/chat", chatRouter);
 
+// Socket.io connection
+// Socket.io connection
 io.on("connection", (socket) => {
-  console.log("new client connected", socket.id);
+  console.log("A user connected");
 
-  socket.on("chatMessage", (msgData) => {
-    io.emit("message", msgData);
+  // Listen for user joining a room
+  socket.on("join", (userId) => {
+    socket.join(userId); // Join the user to a room based on their userId
+    console.log(`User with ID ${userId} joined room`);
+  });
+
+  socket.on("send_message", (message) => {
+    console.log("Message received:", message);
+    // Emit the message to all connected clients
+    io.emit("receive_message", message); // This sends to all clients, adjust as needed
   });
   socket.on("disconnect", () => {
-    console.log("client disconnected", socket.id);
+    console.log("Client disconnected:", socket.id);
   });
 });
+
+// Basic route
 
 app.get("/", (req, res) => {
   res.send("Backend is working!");
 });
-app.listen(Port, async () => {
-  console.log(`server is runing on ${Port}`);
+
+// Start the server
+server.listen(Port, async () => {
+  console.log(`Server is running on port ${Port}`);
   try {
     await connection;
-    console.log(`server is connected with md`);
+    console.log(`Connected to the database`);
   } catch (error) {
-    console.log(`some thing went wrong db is not connected`);
+    console.error(`Error connecting to the database: ${error.message}`);
   }
 });
