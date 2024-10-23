@@ -18,7 +18,7 @@ const io = socketIO(server, {
 
 // CORS options for Express
 const corsOptions = {
-  origin: "http://localhost:3000", // Your frontend URL
+  origin: "*", // Your frontend URL
   methods: ["GET", "POST", "PATCH", "PUT", "DELETE"],
   credentials: true,
 };
