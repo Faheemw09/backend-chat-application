@@ -11,7 +11,7 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIO(server, {
   cors: {
-    origin: process.env.FRONTEND_URL, // Adjust as necessary for your environment
+    origin: "*", // Adjust as necessary for your environment
     methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
     credentials: true,
   },
@@ -19,9 +19,9 @@ const io = socketIO(server, {
 
 // CORS options for Express
 const corsOptions = {
-  origin: process.env.FRONTEND_URL, // Your frontend URL
-  methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
-  credentials: true,
+  origin: "*", // Your frontend URL
+  methods: ["GET", "POST", "PATCH", "OPTIONS"], // Allowed methods
+  allowedHeaders: ["Content-Type", "Authorization"], // Allowed headers
 };
 
 // Middleware

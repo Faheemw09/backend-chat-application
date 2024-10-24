@@ -108,11 +108,11 @@ exports.userLogin = async (req, res) => {
 exports.updateProfile = async (req, res) => {
   const { id } = req.params;
   const { name, email, bio, gender } = req.body;
-  console.log("Uploaded file:", req.file);
-  const profilePic = req.file ? req.file.filename : null; // Get the uploaded file
-  const profilePicUrl = profilePic
-    ? `${req.protocol}://${req.get("host")}/uploads/${profilePic}`
-    : null;
+  // console.log("Uploaded file:", req.file);
+  // const profilePic = req.file ? req.file.filename : null;
+  // const profilePicUrl = profilePic
+  //   ? `${req.protocol}://${req.get("host")}/uploads/${profilePic}`
+  //   : null;
   try {
     const user = await userModel.findById(id);
     if (!user) {
@@ -121,12 +121,12 @@ exports.updateProfile = async (req, res) => {
     if (name) user.name = name;
     if (email) user.email = email;
     if (bio) user.bio = bio;
-    user.profilepic =
-      req.file && req.file.filename ? req.file.filename : user.profilepic;
+    // user.profilepic =
+    //   req.file && req.file.filename ? req.file.filename : user.profilepic;
     if (gender) user.gender = gender;
 
     await user.save();
-    console.log("File saved to:", req.file.path);
+    // console.log("File saved to:", req.file.path);
 
     // Construct the full image URL for the updated profile picture
     // const baseImageUrl = `${req.protocol}://${req.get("host")}/uploads`;
@@ -136,7 +136,7 @@ exports.updateProfile = async (req, res) => {
       message: "User profile updated successfully",
       data: {
         ...user.toObject(),
-        profilePic: profilePicUrl,
+        // profilePic: profilePicUrl,
       },
     });
   } catch (error) {

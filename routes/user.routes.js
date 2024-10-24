@@ -7,7 +7,7 @@ router.post("/user-signup", upload.single("profilePic"), controller.userSignup);
 router.post("/user-signin", controller.userLogin);
 router.patch(
   "/update-profile/:id",
-  upload.single("profilePic"),
+  // upload.single("profilePic"),
   controller.updateProfile
 );
 router.get("/user/:id", controller.getUserById);
