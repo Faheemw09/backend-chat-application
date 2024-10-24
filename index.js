@@ -5,12 +5,13 @@ const path = require("path");
 const socketIO = require("socket.io");
 const { connection } = require("./db");
 require("dotenv").config();
+require("dotenv").config();
 
 const app = express();
 const server = http.createServer(app);
 const io = socketIO(server, {
   cors: {
-    origin: "*", // Adjust as necessary for your environment
+    origin: process.env.FRONTEND_URL, // Adjust as necessary for your environment
     methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
     credentials: true,
   },
@@ -18,7 +19,7 @@ const io = socketIO(server, {
 
 // CORS options for Express
 const corsOptions = {
-  origin: "*", // Your frontend URL
+  origin: process.env.FRONTEND_URL, // Your frontend URL
   methods: ["GET", "POST", "PATCH", "PUT", "DELETE"],
   credentials: true,
 };
